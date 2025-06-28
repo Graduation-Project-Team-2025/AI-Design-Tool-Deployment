@@ -1,5 +1,6 @@
 import os
 import re
+import cv2
 from PIL import Image
 import base64
 import shutil
@@ -9,10 +10,11 @@ from fastapi import UploadFile
 from models import ResponseEnum
 from utils import (
     save_file, 
+    save_temp, 
+    delete_file,
     translate_arabic_to_english
 )
 from models.model_loader import pipe
-
 
 class AI_ToolController(BaseController):
     def __init__(self):
@@ -56,6 +58,43 @@ class AI_ToolController(BaseController):
             ResponseEnum.FILE_UPLOADED_SUCCESSFULLY_AR.value
         )
 
+    def validate_project_id(self, project_id):
+        project_path = os.path.join(self.upload_path, project_id)
+        if os.path.exists(project_path):
+            return (
+                True,
+                ResponseEnum.PROJECT_FOUND_SUCCESSFULLY_ENG.value,
+                ResponseEnum.PROJECT_FOUND_SUCCESSFULLY_AR.value
+            )
+        else:
+            return (
+                False,
+                ResponseEnum.PROJECT_DOES_NOT_EXIST_ENG.value,
+                ResponseEnum.PROJECT_DOES_NOT_EXIST_AR.value
+            )
+
+    def validate_file_id(self, file_id, project_id):
+        project_path = os.path.join(self.upload_path, project_id)
+        filenames = os.listdir(project_path)
+        pattern_img = r"^(?P<file_id>.+)-IMG-ORG\.(?:png|jpg|jpeg)$"
+        file_ids = []
+        for fname in filenames:
+            match = re.match(pattern_img, fname, re.IGNORECASE)
+            if match:
+                file_ids.append(match.group("file_id"))
+        if file_id in file_ids:
+            return (
+                True,
+                ResponseEnum.FILE_FOUND_SUCCESSFULLY_ENG.value,
+                ResponseEnum.FILE_FOUND_SUCCESSFULLY_AR.value
+            )
+        else:
+            return (
+                False,
+                ResponseEnum.FILE_DOES_NOT_EXIST_ENG.value,
+                ResponseEnum.FILE_DOES_NOT_EXIST_AR.value
+            )
+
     def file_exists(self, project_id, filename):
         project_path = os.path.join(self.upload_path, project_id)
         file_path = os.path.join(project_path, filename)
@@ -88,40 +127,8 @@ class AI_ToolController(BaseController):
             upload_dir=self.app_settings.UPLOAD_FILES_PATH
         )
         return filename, file_id
+    
 
-    def read_project(self, project_id: str):
-        project_path = os.path.join(self.upload_path, project_id)
-        if not os.path.exists(project_path):
-            return False, ResponseEnum.FILE_DOES_NOT_EXIST_ENG.value
-
-        filenames = os.listdir(project_path)
-        pattern_img = r"^(?P<file_id>.+)-IMG-ORG\.(?:png|jpg|jpeg)$"
-        file_ids = []
-        for fname in filenames:
-            match = re.match(pattern_img, fname, re.IGNORECASE)
-            if match:
-                file_ids.append(match.group("file_id"))
-
-        project = {}
-        for i, file_id in enumerate(file_ids):
-            image_content = None
-            for filename in filenames:
-                full_path = os.path.join(project_path, filename)
-                if file_id in filename and "IMG-ORG" in filename:
-                    with open(full_path, "rb") as f:
-                        image_content = base64.b64encode(f.read()).decode('utf-8')
-
-            project[f"file{i}_id"] = file_id
-            project[f"files{i}"] = {
-                "Image": image_content
-            }
-
-        shutil.rmtree(project_path)
-        return project
-
-    def delete_project(self, project_id):
-        project_path = os.path.join(self.upload_path, project_id)
-        shutil.rmtree(project_path)
 
     def read_img(self, project_id: str, file_id: str):
         project_path = os.path.join(self.upload_path, project_id)
@@ -159,20 +166,3 @@ class AI_ToolController(BaseController):
         image = Image.open(img_path).convert("RGB")
         return image, filename
 
-    def open_project(self, project_id: str, project_data: dict):
-        project_path = os.path.join(self.upload_path, project_id)
-        os.makedirs(project_path, exist_ok=True)
-
-        for key, files in project_data.items():
-            if key.startswith("files"):
-                index = key.replace("files", "")
-                file_id_key = f"file{index}_id"
-                file_id = project_data.get(file_id_key, key)
-
-                image_b64 = files.get("Image")
-                if image_b64:
-                    image_path = os.path.join(project_path, f"{file_id}-IMG-ORG.png")
-                    with open(image_path, "wb") as f:
-                        f.write(base64.b64decode(image_b64))
-
-        return True

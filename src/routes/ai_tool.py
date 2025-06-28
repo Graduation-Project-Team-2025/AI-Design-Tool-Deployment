@@ -1,5 +1,4 @@
 import os
-import uuid
 from PIL import Image
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -22,28 +21,30 @@ async def generate_endpoint(
 
     is_valid, signal_eng, _ = controller.validate_uploaded_file(image)
     if not is_valid:
-        raise HTTPException(status_code=400, detail=signal_eng)
+        return JSONResponse(
+            status_code=400,
+            content={"valid_file": False, "message": signal_eng}
+        )
 
-    image_pil = Image.open(image.file).convert("RGB")
-    image_id = uuid.uuid4().hex[:10]
-
-    upload_dir = os.getenv("UPLOAD_FILES_PATH", "./uploads")
-    input_path = os.path.join(upload_dir, project_id)
-    os.makedirs(input_path, exist_ok=True)
-
-    original_path = os.path.join(input_path, f"{image_id}.png")
-    image_pil.save(original_path)
+    original_filename, file_id = controller.cache_img(image, project_id)
+    image_path = os.path.join(controller.upload_path, project_id, original_filename)
+    image_pil = Image.open(image_path).convert("RGB")
 
     result = controller.generate(image_pil, prompt_arabic, save)
-    result_path = os.path.join(input_path, f"{image_id}_result.png")
-    result.save(result_path)
+    result_filename, _ = controller.cache_version(result, project_id, file_id)
 
     base_url = str(request.base_url)
-    result_url = base_url + f"image/{project_id}/{image_id}_result.png"
+    result_url = base_url + f"image/{project_id}/{result_filename}"
 
     return JSONResponse(
         status_code=200,
-        content={"image_url": result_url}
+        content={
+            "valid_file": True,
+            "message": signal_eng,
+            "project_id": project_id,
+            "file_id": file_id,
+            "image_url": result_url
+        }
     )
 
 @router.post("/{project_id}/regenerate")
@@ -56,24 +57,17 @@ async def regenerate_endpoint(
 ):
     controller = AI_ToolController()
 
-    upload_dir = os.getenv("UPLOAD_FILES_PATH", "./uploads")
-    input_path = os.path.join(upload_dir, project_id)
-    image_path = os.path.join(input_path, f"{image_id}.png")
-
-    if not os.path.exists(image_path):
-        raise HTTPException(status_code=404, detail="Original image not found")
-
-    image_pil = Image.open(image_path).convert("RGB")
-
+    image_pil, _ = controller.read_img(project_id, image_id)
     result = controller.regenerate(image_pil, new_prompt_arabic, save)
-    result_path = os.path.join(input_path, f"{image_id}_regenerated.png")
-    result.save(result_path)
+    result_filename, _ = controller.cache_version(result, project_id, image_id)
 
-    # Build URL
     base_url = str(request.base_url)
-    result_url = base_url + f"image/{project_id}/{image_id}_regenerated.png"
+    result_url = base_url + f"image/{project_id}/{result_filename}"
 
     return JSONResponse(
         status_code=200,
-        content={"image_url": result_url}
+        content={
+            "image_url": result_url,
+            "file_id": image_id
+        }
     )
