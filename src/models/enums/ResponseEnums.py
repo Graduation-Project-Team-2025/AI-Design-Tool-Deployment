@@ -1,7 +1,10 @@
 from enum import Enum
+from helpers import get_settings
+
 
 class ResponseEnum(Enum):
-
+    
+    app_settings = get_settings()
     FILE_TYPE_NOT_SUPPORTED_ENG = "File Type Not Supported:\nSupported types: jpeg, png, bmp, tiff, webp, x-portable-pixmap, x-portable-graymap, x-portable-bitmap, jp2, x-sun-raster, x-exr, vnd.radiance"
     FILE_SIZE_EXCEEDED_ENG = f"File Size Exceeded: \n Maximum Allowed Size: {app_settings.FILE_ALLOWED_SIZE}MB"
     FILE_UPLOADED_SUCCESSFULLY_ENG = "File Uploaded Successfuly"
