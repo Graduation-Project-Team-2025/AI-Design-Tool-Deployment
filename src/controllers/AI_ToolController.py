@@ -15,6 +15,8 @@ from utils import (
     translate_arabic_to_english
 )
 from models.model_loader import pipe
+import numpy as np
+
 
 class AI_ToolController(BaseController):
     def __init__(self):
@@ -112,15 +114,14 @@ class AI_ToolController(BaseController):
                 ResponseEnum.FILE_DOES_NOT_EXIST_AR.value,
                 ""
             )
-
     def cache_img(self, file: UploadFile, project_id: str):
-        filename, file_id = save_file(
-            file, project_id=project_id,
-            upload_dir=self.app_settings.UPLOAD_FILES_PATH
-        )
-        return filename, file_id
+        filename , file_id = save_file(file, project_id=project_id,
+                                        upload_dir=self.app_settings.UPLOAD_FILES_PATH)
+        return filename , file_id 
 
     def cache_version(self, file, project_id: str, file_id: str):
+        if isinstance(file, Image.Image):
+            file = np.array(file)  # Convert to NumPy before passing
         filename, file_id = save_file(
             file, project_id,
             file_id=file_id,
@@ -128,41 +129,4 @@ class AI_ToolController(BaseController):
         )
         return filename, file_id
     
-
-
-    def read_img(self, project_id: str, file_id: str):
-        project_path = os.path.join(self.upload_path, project_id)
-        matching_files = [
-            x for x in os.listdir(project_path)
-            if file_id in x and "IMG" in x
-        ]
-
-        if not matching_files:
-            raise FileNotFoundError(f"No image found for file_id: {file_id}")
-
-        versioned_files = []
-        org_file = None
-
-        for filename in matching_files:
-            if "VER" in filename:
-                versioned_files.append(filename)
-            elif "ORG" in filename:
-                org_file = filename
-
-        filename = None
-        if versioned_files:
-            def extract_ver_num(f):
-                ver_part = f.split("VER")[-1].split(".")[0]
-                return int(ver_part) if ver_part.isdigit() else -1
-
-            latest_file = max(versioned_files, key=extract_ver_num)
-            filename = latest_file
-        elif org_file:
-            filename = org_file
-        else:
-            raise FileNotFoundError(f"No valid image found (missing ORG/VER): {file_id}")
-
-        img_path = os.path.join(project_path, filename)
-        image = Image.open(img_path).convert("RGB")
-        return image, filename
 

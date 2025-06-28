@@ -42,7 +42,7 @@ async def generate_endpoint(
             "valid_file": True,
             "message": signal_eng,
             "project_id": project_id,
-            "file_id": file_id,
+            "file_id": str(file_id),
             "image_url": result_url
         }
     )
@@ -68,6 +68,6 @@ async def regenerate_endpoint(
         status_code=200,
         content={
             "image_url": result_url,
-            "file_id": image_id
+            "file_id": str(image_id)
         }
     )
