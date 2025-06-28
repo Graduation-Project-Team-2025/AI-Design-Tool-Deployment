@@ -1,7 +1,7 @@
 import os
 import torch
 from diffusers import ControlNetModel, StableDiffusionControlNetPipeline
-from helpers.settings import get_settings
+from helpers import get_settings
 
 settings = get_settings()
 controlnet = ControlNetModel.from_pretrained(settings.CONTROLNET_MODEL)

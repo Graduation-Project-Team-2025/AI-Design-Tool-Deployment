@@ -4,3 +4,5 @@ from .utils import (save_file,
                     save_version,
                     save_temp,
             )
+
+from .translator import translate_arabic_to_english

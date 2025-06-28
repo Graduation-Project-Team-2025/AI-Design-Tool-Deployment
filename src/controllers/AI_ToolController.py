@@ -13,11 +13,11 @@ from utils import (
     save_file, 
     save_temp, 
     delete_file,
+    translate_arabic_to_english
 )
 
 
 from models.model_loader import pipe
-from utils.translator import translate_arabic_to_english
 
 class AI_ToolController(BaseController):
     def __init__(self):

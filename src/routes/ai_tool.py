@@ -1,53 +1,75 @@
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request
+from fastapi.responses import StreamingResponse, JSONResponse
+
 from PIL import Image
 import os
 import uuid
 import io
-from controllers.AI_ToolController import AI_ToolController
-from controllers.AI_ToolController import validate_uploaded_file
+from controllers import AI_ToolController
 
 router = APIRouter(
     prefix="/designer",
     tags=["designer"]
 )
 
-@router.post("/generate")
+
+@router.post("/{project_id}/generate")
 async def generate_endpoint(
+    request: Request,
+    project_id: str,
     image: UploadFile = File(...),
     prompt_arabic: str = Form(...),
     save: bool = Form(False)
 ):
-    validate_uploaded_file(image)
+    controller = AI_ToolController()
+    controller.validate_uploaded_file(image)
     image_pil = Image.open(image.file).convert("RGB")
 
     image_id = uuid.uuid4().hex[:10]
-    input_path = os.path.join(os.getenv("UPLOAD_FILES_PATH"), f"{image_id}.png")
-    os.makedirs(os.path.dirname(input_path), exist_ok=True)
-    image_pil.save(input_path)
+    upload_dir = os.getenv("UPLOAD_FILES_PATH", "/content/uploads")
+    input_path = os.path.join(upload_dir, project_id)
+    os.makedirs(input_path, exist_ok=True)
+    file_path = os.path.join(input_path, f"{image_id}.png")
+    image_pil.save(file_path)
 
-    result = generate(image_pil, prompt_arabic, save)
-    buffer = io.BytesIO()
-    result.save(buffer, format="PNG")
-    buffer.seek(0)
+    result = controller.generate(image_pil, prompt_arabic, save)
+    result_path = os.path.join(input_path, f"{image_id}_result.png")
+    result.save(result_path)
 
-    return StreamingResponse(buffer, media_type="image/png", headers={"X-Image-ID": image_id})
+    base_url = str(request.base_url)
+    preview_url = base_url + f"image/{project_id}/{image_id}_result.png"
+
+    return JSONResponse(
+        status_code=200,
+        content={"image_url": preview_url}
+    )
 
 
-@router.post("/regenerate")
+@router.post("/{project_id}/regenerate")
 async def regenerate_endpoint(
+    request: Request,
+    project_id: str,
     image_id: str = Form(...),
     new_prompt_arabic: str = Form(...),
     save: bool = Form(False)
 ):
-    file_path = os.path.join(os.getenv("UPLOAD_FILES_PATH"), f"{image_id}.png")
+    upload_dir = os.getenv("UPLOAD_FILES_PATH", "/content/uploads")
+    input_path = os.path.join(upload_dir, project_id)
+    file_path = os.path.join(input_path, f"{image_id}.png")
+
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Image ID not found")
 
     image_pil = Image.open(file_path).convert("RGB")
-    result = generate(image_pil, new_prompt_arabic, save)
-    buffer = io.BytesIO()
-    result.save(buffer, format="PNG")
-    buffer.seek(0)
+    controller = AI_ToolController()
+    result = controller.generate(image_pil, new_prompt_arabic, save)
+    result_path = os.path.join(input_path, f"{image_id}_regenerated.png")
+    result.save(result_path)
 
-    return StreamingResponse(buffer, media_type="image/png")
+    base_url = str(request.base_url)
+    preview_url = base_url + f"image/{project_id}/{image_id}_regenerated.png"
+
+    return JSONResponse(
+        status_code=200,
+        content={"image_url": preview_url}
+    )
