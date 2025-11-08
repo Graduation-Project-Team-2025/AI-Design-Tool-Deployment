@@ -22,26 +22,81 @@ ENV HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
 
 RUN uv pip install --system --no-cache-dir huggingface_hub transformers
 
-# HuggingFace login (won't fail the build if it errors)
 RUN python -c "from huggingface_hub import login; import os; \
 try: login(token=os.environ.get('HUGGINGFACE_TOKEN')) \
-except Exception as e: print('HuggingFace login skipped:', e)"
+except Exception as e: print('HuggingFace login skipped:', e)" || true
 
-# Download models (errors will not stop the build)
-RUN python -c "from huggingface_hub import snapshot_download; \
-import os; \
-try: snapshot_download(repo_id='BertChristiaens/controlnet-seg-room', use_auth_token=os.environ.get('HUGGINGFACE_TOKEN'), local_dir='./assets/models-weights/controlnet') \
-except Exception as e: print('ControlNet model download skipped:', e)"
+RUN python -c "from huggingface_hub import snapshot_download; import os; \
+try: snapshot_download(repo_id='BertChristiaens/controlnet-seg-room', \
+use_auth_token=os.environ.get('HUGGINGFACE_TOKEN'), \
+local_dir='./assets/models-weights/controlnet') \
+except Exception as e: print('ControlNet model download skipped:', e)" || true
 
-RUN python -c "from huggingface_hub import snapshot_download; \
-import os; \
-try: snapshot_download(repo_id='runwayml/stable-diffusion-v1-5', use_auth_token=os.environ.get('HUGGINGFACE_TOKEN'), local_dir='./assets/models-weights/base-model') \
-except Exception as e: print('Stable Diffusion model download skipped:', e)"
+RUN python -c "from huggingface_hub import snapshot_download; import os; \
+try: snapshot_download(repo_id='runwayml/stable-diffusion-v1-5', \
+use_auth_token=os.environ.get('HUGGINGFACE_TOKEN'), \
+local_dir='./assets/models-weights/base-model') \
+except Exception as e: print('Stable Diffusion model download skipped:', e)" || true
 
-RUN python -c "from huggingface_hub import snapshot_download; \
-import os; \
-try: snapshot_download(repo_id='Helsinki-NLP/opus-mt-ar-en', use_auth_token=os.environ.get('HUGGINGFACE_TOKEN'), local_dir='./assets/models-weights/translator') \
-except Exception as e: print('Translator model download skipped:', e)"
+RUN python -c "from huggingface_hub import snapshot_download; import os; \
+try: snapshot_download(repo_id='Helsinki-NLP/opus-mt-ar-en', \
+use_auth_token=os.environ.get('HUGGINGFACE_TOKEN'), \
+local_dir='./assets/models-weights/translator') \
+except Exception as e: print('Translator model download skipped:', e)" || true
+
+RUN uv pip install -r requirements.txt --system
+
+COPY src/ .
+
+EXPOSE 8000
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+FROM ghcr.io/astral-sh/uv:0.7.15-python3.12-bookworm-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libavif-dev pkg-config \
+    libjpeg-dev \
+    libgl1 \
+    gcc unzip zip \
+    python3-dev \
+    libxml2-dev \
+    libxslt1-dev \
+    libffi-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY src/requirements.txt .
+
+ARG HUGGINGFACE_TOKEN
+ENV HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
+
+RUN uv pip install --system --no-cache-dir huggingface_hub transformers
+
+RUN python -c "from huggingface_hub import login; import os; \
+try: login(token=os.environ.get('HUGGINGFACE_TOKEN')) \
+except Exception as e: print('HuggingFace login skipped:', e)" || true
+
+# Download ControlNet model (won’t fail)
+RUN python -c "from huggingface_hub import snapshot_download; import os; \
+try: snapshot_download(repo_id='BertChristiaens/controlnet-seg-room', \
+use_auth_token=os.environ.get('HUGGINGFACE_TOKEN'), \
+local_dir='./assets/models-weights/controlnet') \
+except Exception as e: print('ControlNet model download skipped:', e)" || true
+
+RUN python -c "from huggingface_hub import snapshot_download; import os; \
+try: snapshot_download(repo_id='runwayml/stable-diffusion-v1-5', \
+use_auth_token=os.environ.get('HUGGINGFACE_TOKEN'), \
+local_dir='./assets/models-weights/base-model') \
+except Exception as e: print('Stable Diffusion model download skipped:', e)" || true
+
+RUN python -c "from huggingface_hub import snapshot_download; import os; \
+try: snapshot_download(repo_id='Helsinki-NLP/opus-mt-ar-en', \
+use_auth_token=os.environ.get('HUGGINGFACE_TOKEN'), \
+local_dir='./assets/models-weights/translator') \
+except Exception as e: print('Translator model download skipped:', e)" || true
 
 RUN uv pip install -r requirements.txt --system
 
