@@ -3,7 +3,10 @@
 A web-based tool that lets users redesign interior spaces. Users can upload a room photo and write a prompt in Arabic, and the tool generates a new interior design while preserving the room layout, including inpainting windows and doors.
 
 ---
-![Alt text](src/assets/example.PNG)
+<p align="center">
+  <img src="src/assets/demo.gif" width="600"/>
+</p>
+---
 
 ## Features
 
@@ -13,6 +16,8 @@ A web-based tool that lets users redesign interior spaces. Users can upload a ro
 * Supports color changes, texture replacements, and style adaptations.
 
 ---
+![Alt text](src/assets/example.PNG)
+
 
 ## How It Works
 
